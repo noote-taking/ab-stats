@@ -54,7 +54,7 @@ def proportions_ztest(
     -------
     pandas.DataFrame
         한 행에 metric_formula, metric_value, delta_relative, delta_absolute,
-        p_value, CI_relative, CI_absolute, MSS, statistic 컬럼.
+        p_value, CI_relative, CI_absolute, MSS_posthoc, statistic 컬럼.
     """
     epsilon = 1e-10
 
@@ -67,13 +67,18 @@ def proportions_ztest(
     p2 = treatment_success / treatment_n
     diff = p2 - p1
 
-    # 표준오차 및 z-통계량·p-value 직접 계산
-    # delta_se: 비율 차이(p2-p1)의 표준오차 (standard error)
-    delta_se = np.sqrt(p1 * (1 - p1) / control_n + p2 * (1 - p2) / treatment_n)
-    if delta_se <= 0:
-        delta_se = epsilon
-    stat_z = diff / delta_se  # stat_z: z-통계량
+    # z-통계량·p-value: H0 하에서 합동추정량(p_hat)을 쓴 pooled 표준오차로 계산
+    p_hat = (control_success + treatment_success) / (control_n + treatment_n)
+    delta_se_pooled = np.sqrt(p_hat * (1 - p_hat) * (1 / control_n + 1 / treatment_n))
+    if delta_se_pooled <= 0:
+        delta_se_pooled = epsilon
+    stat_z = diff / delta_se_pooled  # stat_z: z-통계량
     p_value = 2 * (1 - norm.cdf(abs(stat_z)))  # 양측검정 p-value
+
+    # 신뢰구간: 비율 차이의 표준오차 (unpooled)
+    delta_se_unpooled = np.sqrt(p1 * (1 - p1) / control_n + p2 * (1 - p2) / treatment_n)
+    if delta_se_unpooled <= 0:
+        delta_se_unpooled = epsilon
 
     # metric_formula: 실험군 성공수/실험군 관측수
     metric_formula = f"{treatment_success}/{treatment_n}"
@@ -83,8 +88,8 @@ def proportions_ztest(
 
     # 신뢰구간 (비율 차이: z 사용)
     z_value = norm.ppf(1 - alpha / 2)  # 양측검정 상위 α/2 지점
-    delta_ci_lower = diff - z_value * delta_se
-    delta_ci_upper = diff + z_value * delta_se
+    delta_ci_lower = diff - z_value * delta_se_unpooled
+    delta_ci_upper = diff + z_value * delta_se_unpooled
     CI_absolute = f"[{delta_ci_lower:.2f}, {delta_ci_upper:.2f}]"
 
     # 증감률(%) 신뢰구간 — 델타 메소드; 비율로 계산 후 CI_relative 표시 시 100 곱함
@@ -100,33 +105,33 @@ def proportions_ztest(
     else:
         CI_relative = "[nan%, nan%]"
 
-    # MSS: Minimum Sample Size (최소 샘플 수) 대비 현재 비율
+    # MSS_posthoc: Minimum Sample Size (최소 샘플 수) 대비 현재 비율 — 사후 계산
     beta = 1 - power  # beta: 제2종 오류 확률
     z_alpha = norm.ppf(1 - alpha / 2)  # z_alpha: 유의수준 α에 대한 z 임계값
     z_beta = norm.ppf(1 - beta)  # z_beta: 검정력(1-β)에 대한 z 값
     k = control_n / treatment_n if treatment_n > 0 else 0  # k: 대조군/실험군 샘플 비율
 
     if k <= 0 or not (0 < p1 < 1 and 0 < p2 < 1):
-        MSS = "0.0% (∞)"
+        MSS_posthoc = "0.0% (∞)"
     else:
         delta_abs = abs(p2 - p1)  # delta_abs: 비율 차이의 절댓값
         if delta_abs <= 0:
-            MSS = "0.0% (∞)"
+            MSS_posthoc = "0.0% (∞)"
         else:
             # n2_min: 검정력을 만족하기 위한 실험군 최소 샘플 수
             n2_min = ((z_alpha + z_beta) ** 2) * (
                 (p1 * (1 - p1)) / k + p2 * (1 - p2)
             ) / (delta_abs**2)
             if np.isnan(n2_min) or n2_min <= 0:
-                MSS = "0.0% (∞)"
+                MSS_posthoc = "0.0% (∞)"
             else:
                 min_n2 = int(np.ceil(n2_min))  # min_n2: 최소 샘플 수 (정수로 올림)
                 ratio_pct = (treatment_n / min_n2) * 100  # ratio_pct: 현재 샘플 수 / 최소 샘플 수 (%)
-                MSS = f"{ratio_pct:.1f}% ({min_n2:,})"
+                MSS_posthoc = f"{ratio_pct:.1f}% ({min_n2:,})"
 
     # 출력: delta_relative 소수 둘째 자리 + '%', delta_absolute 소수 둘째 자리
     delta_relative_out = f"{delta_relative:.2f}%" if np.isfinite(delta_relative) else "nan%"
-    delta_absolute_out = round(delta_absolute, 2)
+    delta_absolute_out = round(delta_absolute, 3)
 
     return pd.DataFrame(
         [
@@ -138,7 +143,7 @@ def proportions_ztest(
                 "p_value": round(p_value, 5),
                 "CI_relative": CI_relative,
                 "CI_absolute": CI_absolute,
-                "MSS": MSS,
+                "MSS_posthoc": MSS_posthoc,
                 "statistic": round(float(stat_z), 2),
             }
         ]
@@ -172,7 +177,7 @@ def ttest_ind_welch(
     -------
     pandas.DataFrame
         한 행에 metric_formula, metric_value, delta_relative, delta_absolute,
-        p_value, CI_relative, CI_absolute, MSS, statistic, df 컬럼.
+        p_value, CI_relative, CI_absolute, MSS_posthoc, statistic, df 컬럼.
     """
     x, y = _to_valid_arrays(control_values, treatment_values)
     n1, n2 = len(x), len(y)
@@ -228,8 +233,8 @@ def ttest_ind_welch(
     if abs(mu1) > epsilon:
         uplift = diff / mu1
         uplift_se = np.sqrt(
-            (1 / max(mu1, epsilon) ** 2) * s2_sq / n2
-            + (mu2**2 / max(mu1, epsilon) ** 4) * s1_sq / n1
+            (1 / mu1**2) * s2_sq / n2
+            + (mu2**2 / mu1**4) * s1_sq / n1
         )
         uplift_ci_lower = uplift - t_value * uplift_se
         uplift_ci_upper = uplift + t_value * uplift_se
@@ -237,31 +242,31 @@ def ttest_ind_welch(
     else:
         CI_relative = "[nan%, nan%]"
 
-    # MSS: Minimum Sample Size (최소 샘플 수) - 평균 차이 기준 (Welch 가정, k = n1/n2)
+    # MSS_posthoc: Minimum Sample Size (최소 샘플 수) - 평균 차이 기준 (Welch 가정, k = n1/n2) — 사후 계산
     beta = 1 - power  # beta: 제2종 오류 확률
     z_alpha = norm.ppf(1 - alpha / 2)  # z_alpha: 유의수준 α에 대한 z 임계값
     z_beta = norm.ppf(1 - beta)  # z_beta: 검정력(1-β)에 대한 z 값
     k = n1 / n2 if n2 > 0 else 0  # k: 대조군/실험군 샘플 비율
 
     if k <= 0:
-        MSS = "0.0% (∞)"
+        MSS_posthoc = "0.0% (∞)"
     else:
         delta_abs = abs(mu2 - mu1)  # delta_abs: 평균 차이의 절댓값
         if delta_abs <= 0 or np.isnan(delta_abs):
-            MSS = "0.0% (∞)"
+            MSS_posthoc = "0.0% (∞)"
         else:
             # n2_min: 검정력을 만족하기 위한 실험군 최소 샘플 수
             n2_min = ((z_alpha + z_beta) ** 2) * (s1_sq / k + s2_sq) / (delta_abs**2)
             if np.isnan(n2_min) or n2_min <= 0:
-                MSS = "0.0% (∞)"
+                MSS_posthoc = "0.0% (∞)"
             else:
                 min_n2 = int(np.ceil(n2_min))  # min_n2: 최소 샘플 수 (정수로 올림)
                 ratio_pct = (n2 / min_n2) * 100  # ratio_pct: 현재 샘플 수 / 최소 샘플 수 (%)
-                MSS = f"{ratio_pct:.1f}% ({min_n2:,})"
+                MSS_posthoc = f"{ratio_pct:.1f}% ({min_n2:,})"
 
     # 출력: delta_relative 소수 둘째 자리 + '%', delta_absolute 소수 둘째 자리
     delta_relative_out = f"{delta_relative:.2f}%" if np.isfinite(delta_relative) else "nan%"
-    delta_absolute_out = round(delta_absolute, 2)
+    delta_absolute_out = round(delta_absolute, 3)
 
     return pd.DataFrame(
         [
@@ -273,7 +278,7 @@ def ttest_ind_welch(
                 "p_value": round(p_value, 5),
                 "CI_relative": CI_relative,
                 "CI_absolute": CI_absolute,
-                "MSS": MSS,
+                "MSS_posthoc": MSS_posthoc,
                 "statistic": round(float(t_stat), 2),
                 "df": round(float(df_welch), 2),
             }

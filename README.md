@@ -1,16 +1,16 @@
 # ab-stats
 
-**ab-stats** is a Python library that computes the statistics you need for A/B tests. It runs a **two-sample proportion z-test** for **rate (proportion) differences** and **Welch's t-test** for **mean differences** between control and treatment groups, and returns p-value, confidence intervals, uplift (relative change), and minimum sample size (MSS) in a pandas DataFrame.
+**ab-stats** is a Python library that computes the statistics you need for A/B tests. It runs a **two-sample proportion z-test** for **rate (proportion) differences** and **Welch's t-test** for **mean differences** between control and treatment groups, and returns p-value, confidence intervals, uplift (relative change), and minimum sample size (MSS_posthoc) in a pandas DataFrame.
 
 ## Features
 - `proportions_ztest()`: Tests the difference in proportion (rate) metrics between control and treatment groups
 - `ttest_ind_welch()`: Tests the difference in mean metrics between control and treatment groups
 
 ## Key notes
-- **Rich output**: Returns pandas DataFrame with metric_formula, metric_value, delta_relative, delta_absolute, p_value, CI_relative, CI_absolute, MSS, statistic (and df for t-test)
+- **Rich output**: Returns pandas DataFrame with metric_formula, metric_value, delta_relative, delta_absolute, p_value, CI_relative, CI_absolute, MSS_posthoc, statistic (and df for t-test)
 - **Two-sided tests**: Both functions perform two-sided hypothesis tests
 - **Delta method**: Confidence intervals for uplift (relative change) computed using the delta method
-- **Note on MSS**: Minimum Sample Size (MSS) is the sample size required for the given α and β under the assumption that the observed effect is true. It is computed post hoc and should be used as a reference only (applies to both proportion and mean tests).
+- **Note on MSS_posthoc**: Minimum Sample Size (MSS_posthoc) is the sample size required for the given α and β under the assumption that the observed effect is true. It is computed post hoc and should be used as a reference only (applies to both proportion and mean tests).
 
 ## Installation
 
@@ -61,8 +61,8 @@ print(df)
 
 **Output:**
 
-| metric_formula | metric_value | delta_relative | delta_absolute | p_value | CI_relative | CI_absolute | MSS | statistic |
-|----------------|--------------|----------------|----------------|---------|-------------|-------------|-----|-----------|
+| metric_formula | metric_value | delta_relative | delta_absolute | p_value | CI_relative | CI_absolute | MSS_posthoc | statistic |
+|----------------|--------------|----------------|----------------|---------|-------------|-------------|-------------|-----------|
 | 122/1001 | 0.121878 | 20.43% | 0.02 | 0.1418 | [-9.52%, 50.38%] | [-0.01, 0.05] | 27.5% (3,641) | 1.47 |
 
 ### 2. Mean difference — `ttest_ind_welch()`
@@ -82,8 +82,8 @@ print(df)
 
 **Output:**
 
-| metric_formula | metric_value | delta_relative | delta_absolute | p_value | CI_relative | CI_absolute | MSS | statistic | df |
-|----------------|--------------|----------------|----------------|---------|-------------|-------------|-----|-----------|-----|
+| metric_formula | metric_value | delta_relative | delta_absolute | p_value | CI_relative | CI_absolute | MSS_posthoc | statistic | df |
+|----------------|--------------|----------------|----------------|---------|-------------|-------------|-------------|-----------|-----|
 | 107/10 | 10.78 | 4.66% | 0.48 | 0.03383 | [0.30%, 9.02%] | [0.04, 0.92] | 62.5% (16) | 2.28 | 19.41 |
 
 ### 3. Using with Pandas
@@ -96,7 +96,7 @@ from ab_stats import proportions_ztest, ttest_ind_welch
 # Proportion test
 result_prop = proportions_ztest(1000, 100, 1000, 120)
 print("Proportion test:")
-print("MSS: ", result_prop["MSS"].iloc[0])
+print("MSS_posthoc: ", result_prop["MSS_posthoc"].iloc[0])
 print("metric_value: ", result_prop["metric_value"].iloc[0])
 print("delta_relative: ", result_prop["delta_relative"].iloc[0])
 print("p_value: ", result_prop["p_value"].iloc[0])
@@ -118,7 +118,7 @@ print("df: ", result_ttest["df"].iloc[0])
 
 ```
 Proportion test:
-MSS:  26.0% (3,839)
+MSS_posthoc:  26.0% (3,839)
 metric_value:  0.12
 delta_relative:  20.00%
 p_value:  0.15271
@@ -131,6 +131,12 @@ delta_relative:  8.54%
 p_value:  0.0006
 df:  19.15
 ```
+
+## References
+
+- [1] Zhou, J., Lu, J., & Shallah, A. (2023). All about sample-size calculations for A/B testing: Novel extensions & practical guide. *Proceedings of the 32nd ACM International Conference on Information and Knowledge Management (CIKM '23)*, 1–30.
+- [2] Chow, S. C., Shao, J., Wang, H., & Lokhnygina, Y. (2017). *Sample Size Calculations in Clinical Research* (3rd ed.). Chapman & Hall/CRC Biostatistics Series.
+- [3] noote-taking. (n.d.). When and how to calculate minimum sample size. noote-taking.github.io. https://noote-taking.github.io/%ED%86%B5%EA%B3%84%ED%95%99/when-and-how-to-calculate-minimum-sample-size/
 
 ## License
 
