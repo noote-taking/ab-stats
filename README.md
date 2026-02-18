@@ -12,10 +12,6 @@
 - **Delta method**: Confidence intervals for uplift (relative change) computed using the delta method
 - **Note on MSS**: Minimum Sample Size (MSS) is the sample size required for the given α and β under the assumption that the observed effect is true. It is computed post hoc and should be used as a reference only (applies to both proportion and mean tests).
 
-## Documentation
-
-- [GitHub Repository](https://github.com/noote-taking/ab-stats)
-
 ## Installation
 
 ### Dependencies
@@ -63,11 +59,11 @@ df = proportions_ztest(
 print(df)
 ```
 
-**Output:** 
+**Output:**
 
 | metric_formula | metric_value | delta_relative | delta_absolute | p_value | CI_relative | CI_absolute | MSS | statistic |
 |----------------|--------------|----------------|----------------|---------|-------------|-------------|-----|-----------|
-| 122/1001 | 0.121878 | 20.430065 | 0.020676 | 0.1418 | [20.13%, 20.73%] | [-0.0069, 0.0483] | 27.5% (3,641) | 1.47 |
+| 122/1001 | 0.121878 | 20.43% | 0.02 | 0.1418 | [-9.52%, 50.38%] | [-0.01, 0.05] | 27.5% (3,641) | 1.47 |
 
 ### 2. Mean difference — `ttest_ind_welch()`
 
@@ -88,7 +84,7 @@ print(df)
 
 | metric_formula | metric_value | delta_relative | delta_absolute | p_value | CI_relative | CI_absolute | MSS | statistic | df |
 |----------------|--------------|----------------|----------------|---------|-------------|-------------|-----|-----------|-----|
-| 107/10 | 10.78 | 4.660194 | 0.48 | 0.03383 | [4.62%, 4.70%] | [0.0406, 0.9194] | 62.5% (16) | 2.28 | 19.41 |
+| 107/10 | 10.78 | 4.66% | 0.48 | 0.03383 | [0.30%, 9.02%] | [0.04, 0.92] | 62.5% (16) | 2.28 | 19.41 |
 
 ### 3. Using with Pandas
 
@@ -102,18 +98,18 @@ result_prop = proportions_ztest(1000, 100, 1000, 120)
 print("Proportion test:")
 print("MSS: ", result_prop["MSS"].iloc[0])
 print("metric_value: ", result_prop["metric_value"].iloc[0])
-print("delta_relative: ", result_prop["delta_relative"].iloc[0], "%")
+print("delta_relative: ", result_prop["delta_relative"].iloc[0])
 print("p_value: ", result_prop["p_value"].iloc[0])
 print("CI_relative: ", result_prop["CI_relative"].iloc[0])
 print("statistic: ", result_prop["statistic"].iloc[0])
 
 # Mean test
 control_vals = [10.1, 9.8, 11.2, 10.5, 9.9, 10.8, 10.3, 11.0, 9.7, 10.4, 9.8, 10.1]  # n=12
-treatment_vals = [12.0, 11.5, 12.8, 11.9, 12.2, 12.5, 11.7, 12.1, 12.3, 11.8]  # n=10
+treatment_vals = [11.0, 11.5, 11.8, 11.9, 11.2, 11.5, 10.7, 11.1, 10.3, 10.8]  # n=10
 result_ttest = ttest_ind_welch(control_vals, treatment_vals)
 print("\nMean test:")
 print("metric_value: ", result_ttest["metric_value"].iloc[0])
-print("delta_relative: ", result_ttest["delta_relative"].iloc[0], "%")
+print("delta_relative: ", result_ttest["delta_relative"].iloc[0])
 print("p_value: ", result_ttest["p_value"].iloc[0])
 print("df: ", result_ttest["df"].iloc[0])
 ```
@@ -124,16 +120,16 @@ print("df: ", result_ttest["df"].iloc[0])
 Proportion test:
 MSS:  26.0% (3,839)
 metric_value:  0.12
-delta_relative:  19.99999999999999 %
+delta_relative:  20.00%
 p_value:  0.15271
-CI_relative:  [19.70%, 20.30%]
+CI_relative:  [-10.06%, 50.06%]
 statistic:  1.43
 
 Mean test:
-metric_value:  12.08
-delta_relative:  17.281553398058268 %
-p_value:  0.0
-df:  19.95
+metric_value:  11.18
+delta_relative:  8.54%
+p_value:  0.0006
+df:  19.15
 ```
 
 ## License

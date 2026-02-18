@@ -82,22 +82,21 @@ def proportions_ztest(
     delta_relative = (diff / p1) * 100 if p1 > epsilon else np.nan
 
     # 신뢰구간 (비율 차이: z 사용)
-    # z_crit: 신뢰구간 계산을 위한 z-분포의 임계값 (양측검정 상위 α/2 지점)
-    z_crit = norm.ppf(1 - alpha / 2)
-    delta_ci_lower = diff - z_crit * delta_se  # CI: confidence interval (신뢰구간)
-    delta_ci_upper = diff + z_crit * delta_se
-    CI_absolute = f"[{delta_ci_lower:.4f}, {delta_ci_upper:.4f}]"
+    z_value = norm.ppf(1 - alpha / 2)  # 양측검정 상위 α/2 지점
+    delta_ci_lower = diff - z_value * delta_se
+    delta_ci_upper = diff + z_value * delta_se
+    CI_absolute = f"[{delta_ci_lower:.2f}, {delta_ci_upper:.2f}]"
 
-    # 증감률(%) 신뢰구간
+    # 증감률(%) 신뢰구간 — 델타 메소드; 비율로 계산 후 CI_relative 표시 시 100 곱함
     if p1 > epsilon:
+        uplift = diff / p1
         uplift_se = np.sqrt(
             (1 / p1**2) * p2 * (1 - p2) / treatment_n
             + (p2**2 / p1**4) * p1 * (1 - p1) / control_n
         )
-        uplift = (diff / p1) * 100
-        uplift_ci_lower = uplift - z_crit * uplift_se
-        uplift_ci_upper = uplift + z_crit * uplift_se
-        CI_relative = f"[{uplift_ci_lower:.2f}%, {uplift_ci_upper:.2f}%]"
+        uplift_ci_lower = uplift - z_value * uplift_se
+        uplift_ci_upper = uplift + z_value * uplift_se
+        CI_relative = f"[{uplift_ci_lower * 100:.2f}%, {uplift_ci_upper * 100:.2f}%]"
     else:
         CI_relative = "[nan%, nan%]"
 
@@ -125,13 +124,17 @@ def proportions_ztest(
                 ratio_pct = (treatment_n / min_n2) * 100  # ratio_pct: 현재 샘플 수 / 최소 샘플 수 (%)
                 MSS = f"{ratio_pct:.1f}% ({min_n2:,})"
 
+    # 출력: delta_relative 소수 둘째 자리 + '%', delta_absolute 소수 둘째 자리
+    delta_relative_out = f"{delta_relative:.2f}%" if np.isfinite(delta_relative) else "nan%"
+    delta_absolute_out = round(delta_absolute, 2)
+
     return pd.DataFrame(
         [
             {
                 "metric_formula": metric_formula,
                 "metric_value": metric_value,
-                "delta_relative": delta_relative,
-                "delta_absolute": delta_absolute,
+                "delta_relative": delta_relative_out,
+                "delta_absolute": delta_absolute_out,
                 "p_value": round(p_value, 5),
                 "CI_relative": CI_relative,
                 "CI_absolute": CI_absolute,
@@ -206,12 +209,10 @@ def ttest_ind_welch(
     # 두 그룹 모두 분산 0(상수)이면 자유도·p-value·CI 무의미 → NaN 반환
     if np.isfinite(df_welch) and df_welch > 0:
         p_value = 2 * (1 - stats.t.cdf(abs(t_stat), df=df_welch))
-        # t_crit_for_ci: 신뢰구간(CI) 계산을 위한 t-분포의 임계값 (critical value)
-        # 양측검정에서 상위 α/2 지점의 t 값 (예: α=0.05면 97.5% 지점)
-        t_crit_for_ci = t.ppf(1 - alpha / 2, df_welch)
+        t_value = t.ppf(1 - alpha / 2, df_welch)  # 양측검정 상위 α/2 지점
     else:
         p_value = np.nan
-        t_crit_for_ci = np.nan
+        t_value = np.nan
 
     diff = mu2 - mu1
     delta_absolute = diff
@@ -219,21 +220,20 @@ def ttest_ind_welch(
     delta_relative = (diff / mu1) * 100 if abs(mu1) > epsilon else np.nan
 
     # 신뢰구간 (평균 차이: t 사용)
-    delta_ci_lower = diff - t_crit_for_ci * se
-    delta_ci_upper = diff + t_crit_for_ci * se
-    CI_absolute = f"[{delta_ci_lower:.4f}, {delta_ci_upper:.4f}]"
+    delta_ci_lower = diff - t_value * se
+    delta_ci_upper = diff + t_value * se
+    CI_absolute = f"[{delta_ci_lower:.2f}, {delta_ci_upper:.2f}]"
 
-    # 증감률(%) 신뢰구간
+    # 증감률(%) 신뢰구간 — 델타 메소드; 비율로 계산 후 CI_relative 표시 시 100 곱함
     if abs(mu1) > epsilon:
-        # uplift_se: 증감률(uplift = (μ2-μ1)/μ1 * 100%)의 표준오차
+        uplift = diff / mu1
         uplift_se = np.sqrt(
             (1 / max(mu1, epsilon) ** 2) * s2_sq / n2
             + (mu2**2 / max(mu1, epsilon) ** 4) * s1_sq / n1
         )
-        uplift = (diff / mu1) * 100  # uplift: 증감률 (%)
-        uplift_ci_lower = uplift - t_crit_for_ci * uplift_se
-        uplift_ci_upper = uplift + t_crit_for_ci * uplift_se
-        CI_relative = f"[{uplift_ci_lower:.2f}%, {uplift_ci_upper:.2f}%]"
+        uplift_ci_lower = uplift - t_value * uplift_se
+        uplift_ci_upper = uplift + t_value * uplift_se
+        CI_relative = f"[{uplift_ci_lower * 100:.2f}%, {uplift_ci_upper * 100:.2f}%]"
     else:
         CI_relative = "[nan%, nan%]"
 
@@ -259,13 +259,17 @@ def ttest_ind_welch(
                 ratio_pct = (n2 / min_n2) * 100  # ratio_pct: 현재 샘플 수 / 최소 샘플 수 (%)
                 MSS = f"{ratio_pct:.1f}% ({min_n2:,})"
 
+    # 출력: delta_relative 소수 둘째 자리 + '%', delta_absolute 소수 둘째 자리
+    delta_relative_out = f"{delta_relative:.2f}%" if np.isfinite(delta_relative) else "nan%"
+    delta_absolute_out = round(delta_absolute, 2)
+
     return pd.DataFrame(
         [
             {
                 "metric_formula": metric_formula,
                 "metric_value": metric_value,
-                "delta_relative": delta_relative,
-                "delta_absolute": delta_absolute,
+                "delta_relative": delta_relative_out,
+                "delta_absolute": delta_absolute_out,
                 "p_value": round(p_value, 5),
                 "CI_relative": CI_relative,
                 "CI_absolute": CI_absolute,
