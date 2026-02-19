@@ -73,7 +73,7 @@ Use this when your metric is a **rate** (e.g. conversion rate, click-through rat
   Default is `0.05` (95% confidence interval).
 
 - **`power`** : *float, optional*  
-  Target statistical power \(1 - \beta\) used when computing MSS_posthoc.  
+  Target statistical power 1 − β used when computing MSS_posthoc.  
   Default is `0.8` (80% power).
 
 > **Returns**  
@@ -92,7 +92,7 @@ Use this when your metric is a **rate** (e.g. conversion rate, click-through rat
     Absolute difference in proportions (treatment − control).
 
   - **`p_value`** : *float*  
-    Two-sided p-value for the null hypothesis \(p_1 = p_2\).
+    Two-sided p-value for the null hypothesis p₁ = p₂.
 
   - **`CI_relative`** : *str*  
     Confidence interval for the relative change (uplift), formatted as `[L%, U%]`.
@@ -147,7 +147,7 @@ Use this when your metric is a **mean** (e.g. average revenue per user, average 
   Default is `0.05` (95% confidence interval).
 
 - **`power`** : *float, optional*
-  Target statistical power \(1 - \beta\) used when computing MSS_posthoc.  
+  Target statistical power 1 − β used when computing MSS_posthoc.  
   Default is `0.8` (80% power).
 
 > **Returns**  
@@ -166,7 +166,7 @@ Use this when your metric is a **mean** (e.g. average revenue per user, average 
     Absolute difference in means (treatment − control).
 
   - **`p_value`** : *float*  
-    Two-sided p-value for the null hypothesis \(\mu_1 = \mu_2\).
+    Two-sided p-value for the null hypothesis μ₁ = μ₂.
 
   - **`CI_relative`** : *str*  
     Confidence interval for the relative change (uplift), formatted as `[L%, U%]`.
