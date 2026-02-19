@@ -64,3 +64,4 @@ Thumbs.db
 # Project: 불필요 파일
 statistics.py
 tests/
+docs/

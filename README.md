@@ -1,16 +1,26 @@
 # ab-stats
 
-**ab-stats** is a Python library that computes the statistics you need for A/B tests. It runs a **two-sample proportion z-test** for **rate (proportion) differences** and **Welch's t-test** for **mean differences** between control and treatment groups, and returns p-value, confidence intervals, uplift (relative change), and minimum sample size (MSS_posthoc) in a pandas DataFrame.
+**ab-stats** is a lightweight Python library for **A/B test statistical analysis**.
+It provides a two-sample proportion z-test and Welch's t-test with confidence intervals,
+uplift, and post-hoc minimum sample size in a pandas DataFrame.
 
-## Features
-- `proportions_ztest()`: Tests the difference in proportion (rate) metrics between control and treatment groups
-- `ttest_ind_welch()`: Tests the difference in mean metrics between control and treatment groups
+
+## When to use which test?
+
+Use the appropriate function depending on whether your metric is a proportion (rate) or a mean, i.e., choose the test that matches the scale of the metric you want to compare between control and treatment groups.
+
+| Metric type       | Example                                     | Function              |
+|-------------------|---------------------------------------------|-----------------------|
+| Proportion (rate) | CTR, PUR, conversion rate, signup rate      | `proportions_ztest()` |
+| Mean (continuous) | ARPU, average session length, time on page  | `ttest_ind_welch()`   |
 
 ## Key notes
-- **Rich output**: Returns pandas DataFrame with metric_formula, metric_value, delta_relative, delta_absolute, p_value, CI_relative, CI_absolute, MSS_posthoc, statistic (and df for t-test)
+- **Rich output**: Returns pandas DataFrame with `metric_formula`, `metric_value`, `delta_relative`, `delta_absolute`,  
+  `p_value`, `CI_relative`, `CI_absolute`, `MSS_posthoc`, `statistic` (and `df` for t-test)
 - **Two-sided tests**: Both functions perform two-sided hypothesis tests
-- **Delta method**: Confidence intervals for uplift (relative change) computed using the delta method
-- **Note on MSS_posthoc**: Minimum Sample Size (MSS_posthoc) is the sample size required for the given α and β under the assumption that the observed effect is true. It is computed post hoc and should be used as a reference only (applies to both proportion and mean tests).
+- **Delta method**: Confidence intervals for uplift (relative change) are computed using the delta method
+- **Note on MSS_posthoc**: Minimum sample size required for the given α and β under the assumption that the observed effect is true. **It is computed post hoc and is for reference only** (not for pre-experiment sample size calculation).
+
 
 ## Installation
 
@@ -32,7 +42,7 @@ Install from PyPI with pip:
 pip install ab-stats
 ```
 
-or with conda (currently under review):
+or with conda (Conda packages are planned):
 
 ```bash
 conda install -c conda-forge ab-stats
@@ -40,10 +50,65 @@ conda install -c conda-forge ab-stats
 
 ## Quick start
 
-### 1. Proportion (rate) difference — `proportions_ztest()`
+### 1. proportions_ztest()
 
 Use this when your metric is a **rate** (e.g. conversion rate, click-through rate). Pass **sample sizes** and **success counts** for control and treatment; the function returns uplift, confidence intervals, and minimum sample size.
 
+> **Parameters**
+
+- **`control_n`** : *int*
+  Total number of observations in the control group.
+
+- **`control_success`** : *int*  
+  Number of “successes” (e.g. converted users) in the control group.
+
+- **`treatment_n`** : *int*  
+  Total number of observations in the treatment group.
+
+- **`treatment_success`** : *int*
+  Number of “successes” in the treatment group.
+
+- **`alpha`** : *float, optional*  
+  Significance level for confidence intervals and MSS_posthoc.  
+  Default is `0.05` (95% confidence interval).
+
+- **`power`** : *float, optional*  
+  Target statistical power \(1 - \beta\) used when computing MSS_posthoc.  
+  Default is `0.8` (80% power).
+
+> **Returns**  
+> *pandas.DataFrame (one row) with the following columns:*
+
+  - **`metric_formula`** : *str*  
+    String representation of the metric (e.g. `122/1001`).
+
+  - **`metric_value`** : *float*  
+    Observed proportion in the treatment group.
+
+  - **`delta_relative`** : *str*  
+    Relative change (uplift) of treatment vs control, formatted as a percentage (e.g. `20.43%`).
+
+  - **`delta_absolute`** : *float*  
+    Absolute difference in proportions (treatment − control).
+
+  - **`p_value`** : *float*  
+    Two-sided p-value for the null hypothesis \(p_1 = p_2\).
+
+  - **`CI_relative`** : *str*  
+    Confidence interval for the relative change (uplift), formatted as `[L%, U%]`.
+
+  - **`CI_absolute`** : *str*  
+    Confidence interval for the absolute difference in proportions, formatted as `[L, U]`.
+
+  - **`MSS_posthoc`** : *str*  
+    Post hoc minimum sample size status (e.g. `27.5% (3,641)`).  
+    The percentage is the ratio of current treatment sample size to the required minimum under the observed effect.
+
+  - **`statistic`** : *float*  
+    z-statistic of the two-sample proportion test.
+
+
+#### Example
 ```python
 from ab_stats import proportions_ztest
 
@@ -65,10 +130,61 @@ print(df)
 |----------------|--------------|----------------|----------------|---------|-------------|-------------|-------------|-----------|
 | 122/1001 | 0.121878 | 20.43% | 0.02 | 0.1418 | [-9.52%, 50.38%] | [-0.01, 0.05] | 27.5% (3,641) | 1.47 |
 
-### 2. Mean difference — `ttest_ind_welch()`
+### 2. ttest_ind_welch()
 
 Use this when your metric is a **mean** (e.g. average revenue per user, average session length). Pass **lists of values** (one value per user or per observation) for control and treatment; the function computes means, variances, and sample sizes internally and returns uplift, confidence intervals, and minimum sample size. The result also includes *df* (degrees of freedom for the Welch t-test).
 
+> **Parameters**
+
+- **`control_values`** : *array_like*  
+  Observations in the control group (e.g. list or array; one value per observation).
+
+- **`treatment_values`** : *array_like*  
+  Observations in the treatment group.
+
+- **`alpha`** : *float, optional*
+  Significance level for confidence intervals and MSS_posthoc.  
+  Default is `0.05` (95% confidence interval).
+
+- **`power`** : *float, optional*
+  Target statistical power \(1 - \beta\) used when computing MSS_posthoc.  
+  Default is `0.8` (80% power).
+
+> **Returns**  
+> *pandas.DataFrame (one row) with the following columns:*
+
+  - **`metric_formula`** : *str*  
+    String representation of the treatment mean (e.g. `107/10`, i.e. sum / n).
+
+  - **`metric_value`** : *float*  
+    Observed mean in the treatment group.
+
+  - **`delta_relative`** : *str*  
+    Relative change (uplift) of treatment vs control mean, formatted as a percentage.
+
+  - **`delta_absolute`** : *float*  
+    Absolute difference in means (treatment − control).
+
+  - **`p_value`** : *float*  
+    Two-sided p-value for the null hypothesis \(\mu_1 = \mu_2\).
+
+  - **`CI_relative`** : *str*  
+    Confidence interval for the relative change (uplift), formatted as `[L%, U%]`.
+
+  - **`CI_absolute`** : *str*  
+    Confidence interval for the absolute difference in means, formatted as `[L, U]`.
+
+  - **`MSS_posthoc`** : *str*  
+    Post hoc minimum sample size status (e.g. `62.5% (16)`).  
+    The percentage is the ratio of current treatment sample size to the required minimum under the observed effect.
+
+  - **`statistic`** : *float*  
+    t-statistic of Welch’s t-test.
+
+  - **`df`** : *float*  
+    Degrees of freedom (Welch–Satterthwaite).
+
+#### Example
 ```python
 from ab_stats import ttest_ind_welch
 
@@ -76,7 +192,7 @@ from ab_stats import ttest_ind_welch
 control = [10.1, 9.8, 11.2, 10.5, 9.9, 10.8, 10.3, 11.0, 9.7, 10.4, 9.8, 10.1]  # n=12
 treatment = [11.0, 10.5, 11.8, 10.9, 11.2, 10.5, 10.7, 10.1, 10.3, 10.8]  # n=10
 
-df = ttest_ind_welch(control, treatment, alpha=0.05, power=0.8)
+df = ttest_ind_welch(control_values=control, treatment_values=treatment, alpha=0.05, power=0.8)
 print(df)
 ```
 
