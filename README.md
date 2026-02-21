@@ -15,8 +15,8 @@ Use the appropriate function depending on whether your metric is a proportion (r
 | Mean (continuous) | ARPU, average session length, time on page  | `ttest_ind_welch()`   |
 
 ## Key notes
-- **Rich output**: Returns pandas DataFrame with `metric_formula`, `metric_value`, `delta_relative`, `delta_absolute`,  
-  `p_value`, `CI_relative`, `CI_absolute`, `MSS_posthoc`, `statistic` (and `df` for t-test)
+- **Rich output**: Returns pandas DataFrame with `control_formula`, `treatment_formula`, `control_value`, `treatment_value`,  
+  `delta_relative`, `delta_absolute`, `p_value`, `CI_relative`, `CI_absolute`, `MSS_posthoc`, `statistic` (and `df` for t-test)
 - **Two-sided tests**: Both functions perform two-sided hypothesis tests
 - **Delta method**: Confidence intervals for uplift (relative change) are computed using the delta method
 - **Note on MSS_posthoc**: Minimum sample size required for the given α and β under the assumption that the observed effect is true. **It is computed post hoc and is for reference only** (not for pre-experiment sample size calculation).
@@ -79,17 +79,23 @@ Use this when your metric is a **rate** (e.g. conversion rate, click-through rat
 > **Returns**  
 > *pandas.DataFrame (one row) with the following columns:*
 
-  - **`metric_formula`** : *str*  
-    String representation of the metric (e.g. `122/1001`).
+  - **`control_formula`** : *str*  
+    Control metric formula (e.g. `101/998`).
 
-  - **`metric_value`** : *float*  
-    Observed proportion in the treatment group.
+  - **`treatment_formula`** : *str*  
+    Treatment metric formula (e.g. `122/1001`).
+
+  - **`control_value`** : *str*  
+    Control proportion, formatted as percentage (e.g. `10.12%`).
+
+  - **`treatment_value`** : *str*  
+    Treatment proportion, formatted as percentage (e.g. `12.19%`).
 
   - **`delta_relative`** : *str*  
     Relative change (uplift) of treatment vs control, formatted as a percentage (e.g. `20.43%`).
 
-  - **`delta_absolute`** : *float*  
-    Absolute difference in proportions (treatment − control).
+  - **`delta_absolute`** : *str*  
+    Absolute difference in proportions in percentage points (e.g. `2.07%p`).
 
   - **`p_value`** : *float*  
     Two-sided p-value for the null hypothesis p₁ = p₂.
@@ -126,9 +132,9 @@ print(df)
 
 **Output:**
 
-| metric_formula | metric_value | delta_relative | delta_absolute | p_value | CI_relative | CI_absolute | MSS_posthoc | statistic |
-|----------------|--------------|----------------|----------------|---------|-------------|-------------|-------------|-----------|
-| 122/1001 | 0.121878 | 20.43% | 0.02 | 0.1418 | [-9.52%, 50.38%] | [-0.01, 0.05] | 27.5% (3,641) | 1.47 |
+| control_formula | treatment_formula | control_value | treatment_value | delta_relative | delta_absolute | p_value | CI_relative | CI_absolute | MSS_posthoc | statistic |
+|-----------------|-------------------|---------------|-----------------|----------------|----------------|---------|-------------|-------------|-------------|-----------|
+| 101/998 | 122/1001 | 10.12% | 12.19% | 20.43% | 2.07%p | 0.14206 | [-9.52%, 50.38%] | [-0.01, 0.05] | 27.5% (3,641) | 1.47 |
 
 ### 2. ttest_ind_welch()
 
@@ -153,10 +159,16 @@ Use this when your metric is a **mean** (e.g. average revenue per user, average 
 > **Returns**  
 > *pandas.DataFrame (one row) with the following columns:*
 
-  - **`metric_formula`** : *str*  
-    String representation of the treatment mean (e.g. `107/10`, i.e. sum / n).
+  - **`control_formula`** : *str*  
+    Control mean formula (e.g. `123/12`, i.e. sum / n).
 
-  - **`metric_value`** : *float*  
+  - **`treatment_formula`** : *str*  
+    Treatment mean formula (e.g. `107/10`).
+
+  - **`control_value`** : *float*  
+    Observed mean in the control group.
+
+  - **`treatment_value`** : *float*  
     Observed mean in the treatment group.
 
   - **`delta_relative`** : *str*  
@@ -198,9 +210,9 @@ print(df)
 
 **Output:**
 
-| metric_formula | metric_value | delta_relative | delta_absolute | p_value | CI_relative | CI_absolute | MSS_posthoc | statistic | df |
-|----------------|--------------|----------------|----------------|---------|-------------|-------------|-------------|-----------|-----|
-| 107/10 | 10.78 | 4.66% | 0.48 | 0.03383 | [0.30%, 9.02%] | [0.04, 0.92] | 62.5% (16) | 2.28 | 19.41 |
+| control_formula | treatment_formula | control_value | treatment_value | delta_relative | delta_absolute | p_value | CI_relative | CI_absolute | MSS_posthoc | statistic | df |
+|-----------------|-------------------|---------------|-----------------|----------------|----------------|---------|-------------|-------------|-------------|-----------|-----|
+| 123/12 | 107/10 | 10.3 | 10.78 | 4.66% | 0.48 | 0.03383 | [0.30%, 9.02%] | [0.04, 0.92] | 62.5% (16) | 2.28 | 19.41 |
 
 ### 3. Using with Pandas
 
@@ -213,7 +225,7 @@ from ab_stats import proportions_ztest, ttest_ind_welch
 result_prop = proportions_ztest(1000, 100, 1000, 120)
 print("Proportion test:")
 print("MSS_posthoc: ", result_prop["MSS_posthoc"].iloc[0])
-print("metric_value: ", result_prop["metric_value"].iloc[0])
+print("treatment_value: ", result_prop["treatment_value"].iloc[0])
 print("delta_relative: ", result_prop["delta_relative"].iloc[0])
 print("p_value: ", result_prop["p_value"].iloc[0])
 print("CI_relative: ", result_prop["CI_relative"].iloc[0])
@@ -224,7 +236,7 @@ control_vals = [10.1, 9.8, 11.2, 10.5, 9.9, 10.8, 10.3, 11.0, 9.7, 10.4, 9.8, 10
 treatment_vals = [11.0, 11.5, 11.8, 11.9, 11.2, 11.5, 10.7, 11.1, 10.3, 10.8]  # n=10
 result_ttest = ttest_ind_welch(control_vals, treatment_vals)
 print("\nMean test:")
-print("metric_value: ", result_ttest["metric_value"].iloc[0])
+print("control_value: ", result_ttest["control_value"].iloc[0])
 print("delta_relative: ", result_ttest["delta_relative"].iloc[0])
 print("p_value: ", result_ttest["p_value"].iloc[0])
 print("df: ", result_ttest["df"].iloc[0])
@@ -235,14 +247,14 @@ print("df: ", result_ttest["df"].iloc[0])
 ```
 Proportion test:
 MSS_posthoc:  26.0% (3,839)
-metric_value:  0.12
+treatment_value:  12.00%
 delta_relative:  20.00%
-p_value:  0.15271
+p_value:  0.15292
 CI_relative:  [-10.06%, 50.06%]
 statistic:  1.43
 
 Mean test:
-metric_value:  11.18
+control_value:  10.3
 delta_relative:  8.54%
 p_value:  0.0006
 df:  19.15

@@ -53,8 +53,9 @@ def proportions_ztest(
     Returns
     -------
     pandas.DataFrame
-        한 행에 metric_formula, metric_value, delta_relative, delta_absolute,
-        p_value, CI_relative, CI_absolute, MSS_posthoc, statistic 컬럼.
+        한 행에 control_formula, treatment_formula, control_value, treatment_value,
+        delta_relative, delta_absolute, p_value, CI_relative, CI_absolute,
+        MSS_posthoc, statistic 컬럼.
     """
     epsilon = 1e-10
 
@@ -80,9 +81,11 @@ def proportions_ztest(
     if delta_se_unpooled <= 0:
         delta_se_unpooled = epsilon
 
-    # metric_formula: 실험군 성공수/실험군 관측수
-    metric_formula = f"{treatment_success}/{treatment_n}"
-    metric_value = p2
+    # 대조군/실험군 지표 공식 및 값
+    control_formula = f"{control_success}/{control_n}"
+    treatment_formula = f"{treatment_success}/{treatment_n}"
+    control_value = p1
+    treatment_value = p2
     delta_absolute = diff
     delta_relative = (diff / p1) * 100 if p1 > epsilon else np.nan
 
@@ -129,15 +132,19 @@ def proportions_ztest(
                 ratio_pct = (treatment_n / min_n2) * 100  # ratio_pct: 현재 샘플 수 / 최소 샘플 수 (%)
                 MSS_posthoc = f"{ratio_pct:.1f}% ({min_n2:,})"
 
-    # 출력: delta_relative 소수 둘째 자리 + '%', delta_absolute 소수 둘째 자리
+    # 출력: control_value, treatment_value는 100 곱해 %로, delta_relative/ delta_absolute 포맷
+    control_value_out = f"{control_value * 100:.2f}%"
+    treatment_value_out = f"{treatment_value * 100:.2f}%"
     delta_relative_out = f"{delta_relative:.2f}%" if np.isfinite(delta_relative) else "nan%"
-    delta_absolute_out = round(delta_absolute, 3)
+    delta_absolute_out = f"{delta_absolute * 100:.2f}%p"  # 비율 차이 → 퍼센트 포인트
 
     return pd.DataFrame(
         [
             {
-                "metric_formula": metric_formula,
-                "metric_value": metric_value,
+                "control_formula": control_formula,
+                "treatment_formula": treatment_formula,
+                "control_value": control_value_out,
+                "treatment_value": treatment_value_out,
                 "delta_relative": delta_relative_out,
                 "delta_absolute": delta_absolute_out,
                 "p_value": round(p_value, 5),
@@ -176,8 +183,9 @@ def ttest_ind_welch(
     Returns
     -------
     pandas.DataFrame
-        한 행에 metric_formula, metric_value, delta_relative, delta_absolute,
-        p_value, CI_relative, CI_absolute, MSS_posthoc, statistic, df 컬럼.
+        한 행에 control_formula, treatment_formula, control_value, treatment_value,
+        delta_relative, delta_absolute, p_value, CI_relative, CI_absolute,
+        MSS_posthoc, statistic, df 컬럼.
     """
     x, y = _to_valid_arrays(control_values, treatment_values)
     n1, n2 = len(x), len(y)
@@ -188,7 +196,8 @@ def ttest_ind_welch(
             f"Got control n={n1}, treatment n={n2}."
         )
 
-    # 리스트 기준: 관측수 = len, 누적값 = sum (0 포함)
+    # 리스트 기준: 관측수 = len, 누적값 = sum
+    control_sum = float(np.sum(x))
     treatment_sum = float(np.sum(y))
     mu1 = float(np.mean(x))
     mu2 = float(np.mean(y))
@@ -196,9 +205,11 @@ def ttest_ind_welch(
     s1_sq = float(np.var(x, ddof=1)) if n1 > 1 else 0.0
     s2_sq = float(np.var(y, ddof=1)) if n2 > 1 else 0.0
 
-    # metric_formula: 실험군 누적값/실험군 관측수 (분자는 정수로 표기, 합계가 소수인 경우 없음)
-    metric_formula = f"{int(treatment_sum)}/{n2}"
-    metric_value = mu2
+    # 대조군/실험군 지표 공식 및 값 (합계/관측수, 분자는 정수로 표기)
+    control_formula = f"{int(control_sum)}/{n1}"
+    treatment_formula = f"{int(treatment_sum)}/{n2}"
+    control_value = mu1
+    treatment_value = mu2
 
     # Welch t-통계량 및 자유도
     se = np.sqrt(s1_sq / n1 + s2_sq / n2)  # se: standard error (표준오차)
@@ -271,8 +282,10 @@ def ttest_ind_welch(
     return pd.DataFrame(
         [
             {
-                "metric_formula": metric_formula,
-                "metric_value": metric_value,
+                "control_formula": control_formula,
+                "treatment_formula": treatment_formula,
+                "control_value": control_value,
+                "treatment_value": treatment_value,
                 "delta_relative": delta_relative_out,
                 "delta_absolute": delta_absolute_out,
                 "p_value": round(p_value, 5),
