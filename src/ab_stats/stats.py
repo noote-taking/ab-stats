@@ -4,10 +4,127 @@ A/B 테스트 통계 검정: 비율 차이(z-test), 평균 차이(Welch t-test)
 리스트/관측수를 받아 함수 내부에서 평균·분산·표본크기를 계산한 뒤 검정합니다
 """
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Dict, Mapping, Optional
+
 import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy.stats import t, norm
+
+
+def _strip_nan_float_array(values) -> np.ndarray:
+    """array_like → float ndarray, NaN 제거."""
+    float_values = np.asarray(values, dtype=float)
+    return float_values[~np.isnan(float_values)]
+
+
+@dataclass(frozen=True)
+class WinsorizeExperimentResult:
+    """
+    여러 실험그룹을 합친 풀 기준 winsorization 결과.
+
+    Attributes
+    ----------
+    percentiles : str
+        합동 풀의 90·95·99·100번째 백분위수 문자열 (100th는 최댓값).
+    p90, p95, p99, p100 : float
+        동일 풀의 수치 백분위수.
+    pool_n : int
+        합동 풀 관측 수 (모든 실험그룹의 유효 값 개수).
+    winsorized : dict[str, numpy.ndarray]
+        입력과 같은 키, 실험그룹별 1차원 배열 (upper_tail=None 이면 원본 복사).
+    """
+
+    percentiles: str
+    p90: float
+    p95: float
+    p99: float
+    p100: float
+    pool_n: int
+    winsorized: Dict[str, np.ndarray]
+
+
+def winsorize_experiment_groups(
+    observations_by_variant: Mapping[str, Any],
+    upper_tail=None,
+) -> WinsorizeExperimentResult:
+    """
+    모든 실험그룹의 값을 **하나의 합동 풀**로 이어 붙여 백분위를 구합니다.
+    `upper_tail`이 0.05 또는 0.01이면 풀에서 정한 **상단 캡**을 각 그룹 배열에 동일하게 적용하고, `None`이면 복사만 합니다.
+    풀의 수치에는 키(실험그룹 이름)가 쓰이지 않습니다.
+
+    Parameters
+    ----------
+    observations_by_variant : mapping of str to array_like
+        실험그룹 이름(예: "A", "B")을 키로, 해당 그룹의 지표값들을 1차원 배열로 담은 매핑입니다.
+    upper_tail : {None, 0.05, 0.01}, optional
+        상단 꼬리 기준으로 풀의 어느 분위수를 캡으로 쓸지 정합니다.
+        `None`이면 상단 캡 없이 복사만 합니다.
+        `0.05`이면 합동 풀의 **95분위**를 상단 캡으로 사용합니다(상단 약 5% 꼬리).
+        `0.01`이면 합동 풀의 **99분위**를 상단 캡으로 사용합니다(상단 약 1% 꼬리).
+
+    Returns
+    -------
+    WinsorizeExperimentResult
+
+    Raises
+    ------
+    ValueError
+        observations_by_variant가 비었거나, upper_tail이 허용값이 아니거나, 어느 실험그룹에도 유효 값이 없을 때.
+    """
+    #1) 인자 검증: 비어 있는 observations_by_variant·허용되지 않은 upper_tail을 조기에 거른다.
+    if not observations_by_variant:
+        raise ValueError("observations_by_variant must be non-empty.")
+    if upper_tail is not None and upper_tail not in (0.05, 0.01):
+        raise ValueError("upper_tail must be None, 0.05, or 0.01.")
+
+    #2) 실험그룹별로 float 배열화 후 NaN 제거; 유효 관측이 없는 그룹은 풀을 만들 수 없으므로 예외.
+    cleaned: Dict[str, np.ndarray] = {}
+    for group_key, values in observations_by_variant.items():
+        cleaned_arr = _strip_nan_float_array(values)
+        if cleaned_arr.size == 0:
+            raise ValueError(
+                f"Group {group_key!r} has no valid (non-NaN) observations."
+            )
+        cleaned[group_key] = cleaned_arr
+
+    #3) 모든 그룹의 유효 값을 이어 붙여 합동 풀(combined)을 만든다. 백분위·캡은 이 풀 기준으로만 계산한다.
+    combined = np.concatenate(list(cleaned.values()))
+    #4) 풀에서 90·95·99·100 백분위를 구하고, 로그/리포트용 문자열과 반환 필드에 쓴다.
+    p90, p95, p99, p100 = np.percentile(combined, [90, 95, 99, 100])
+    percentiles_str = (
+        f"[90th: {p90:.2f}, 95th: {p95:.2f}, 99th: {p99:.2f}, 100th: {p100:.2f}]"
+    )
+
+    #5) upper_tail에 따라 상단 캡(upper_cap)만 정한다. None이면 이후 단계에서 복사만 한다.
+    if upper_tail is None:
+        upper_cap: Optional[float] = None
+    elif upper_tail == 0.05:
+        upper_cap = float(p95)
+    else:
+        upper_cap = float(p99)
+
+    #6) 각 실험그룹 배열에 상한을 적용한다. 캡은 풀에서 한 번 정한 값을 모든 그룹에 동일하게 사용한다.
+    winsorized: Dict[str, np.ndarray] = {}
+    for group_key, cleaned_arr in cleaned.items():
+        if upper_cap is None:
+            winsorized[group_key] = cleaned_arr.copy()
+        else:
+            winsorized[group_key] = np.minimum(cleaned_arr, upper_cap)
+
+    #7) 백분위·풀 크기·winsorize된 그룹별 배열을 묶어 반환한다.
+    return WinsorizeExperimentResult(
+        percentiles=percentiles_str,
+        p90=float(p90),
+        p95=float(p95),
+        p99=float(p99),
+        p100=float(p100),
+        pool_n=int(combined.size),
+        winsorized=winsorized,
+    )
 
 
 def _to_valid_arrays(control_values, treatment_values):
@@ -205,9 +322,9 @@ def ttest_ind_welch(
     s1_sq = float(np.var(x, ddof=1)) if n1 > 1 else 0.0
     s2_sq = float(np.var(y, ddof=1)) if n2 > 1 else 0.0
 
-    # 대조군/실험군 지표 공식 및 값 (합계/관측수, 분자는 정수로 표기)
-    control_formula = f"{int(control_sum)}/{n1}"
-    treatment_formula = f"{int(treatment_sum)}/{n2}"
+    # 대조군/실험군 지표 공식 (합계/관측수, 합은 소수 둘째 자리)
+    control_formula = f"{control_sum:.2f}/{n1}"
+    treatment_formula = f"{treatment_sum:.2f}/{n2}"
     control_value = mu1
     treatment_value = mu2
 

@@ -12,6 +12,17 @@ try:
 except PackageNotFoundError:
     __version__ = "0.0.0.dev0"
 
-from ab_stats.stats import proportions_ztest, ttest_ind_welch
+from ab_stats.stats import (
+    WinsorizeExperimentResult,
+    proportions_ztest,
+    ttest_ind_welch,
+    winsorize_experiment_groups,
+)
 
-__all__ = ["proportions_ztest", "ttest_ind_welch", "__version__"]
+__all__ = [
+    "WinsorizeExperimentResult",
+    "proportions_ztest",
+    "ttest_ind_welch",
+    "winsorize_experiment_groups",
+    "__version__",
+]
